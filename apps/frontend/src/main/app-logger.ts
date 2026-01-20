@@ -21,8 +21,10 @@ import { join, dirname } from 'path';
 import os from 'os';
 
 // Configure electron-log (wrapped in try-catch for re-import scenarios in tests)
+// Note: preload: false disables the renderer console spy which uses CommonJS require()
+// that doesn't work in ESM context (causes "require is not defined" error)
 try {
-  log.initialize();
+  log.initialize({ preload: false });
 } catch {
   // Already initialized, ignore
 }
