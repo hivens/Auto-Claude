@@ -801,7 +801,7 @@ export function App() {
               {/* Drag overlay - shows what's being dragged */}
               <DragOverlay>
                 {activeDragProject && (
-                  <div className="flex items-center gap-2 bg-card border border-border rounded-md px-4 py-2.5 shadow-lg max-w-[200px]">
+                  <div className="flex items-center gap-2 bg-card border border-border rounded-md px-4 py-2.5 shadow-lg max-w-50">
                     <div className="w-1 h-4 bg-muted-foreground rounded-full" />
                     <span className="truncate font-medium text-sm">
                       {activeDragProject.name}
@@ -1055,7 +1055,7 @@ export function App() {
             </DialogHeader>
             {removeProjectError && (
               <div className="flex items-center gap-2 p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>{removeProjectError}</span>
               </div>
             )}

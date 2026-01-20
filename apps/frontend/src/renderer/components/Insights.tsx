@@ -367,7 +367,7 @@ export function Insights({ projectId }: InsightsProps) {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask about your codebase..."
-            className="min-h-[80px] resize-none"
+            className="min-h-20 resize-none"
             disabled={isLoading}
           />
           <Button
@@ -590,7 +590,7 @@ function ToolUsageHistory({ tools }: ToolUsageHistoryProps) {
                 <Icon className={cn('h-3 w-3 shrink-0', getToolColor(tool.name))} />
                 <span className="font-medium">{tool.name}</span>
                 {tool.input && (
-                  <span className="text-muted-foreground truncate max-w-[250px]">
+                  <span className="text-muted-foreground truncate max-w-62.5">
                     {tool.input}
                   </span>
                 )}
@@ -650,7 +650,7 @@ function ToolIndicator({ name, input }: ToolIndicatorProps) {
       <Icon className="h-4 w-4 animate-pulse" />
       <span className="font-medium">{label}</span>
       {input && (
-        <span className="text-muted-foreground truncate max-w-[300px]">
+        <span className="text-muted-foreground truncate max-w-75">
           {input}
         </span>
       )}
