@@ -35,9 +35,14 @@ def get_commit_count(project_dir: Path) -> int:
         timeout=10,
     )
     if result.returncode == 0:
+        output = result.stdout.strip()
+        if not output:
+            logger.debug("Git returned empty output for commit count")
+            return 0
         try:
-            return int(result.stdout.strip())
+            return int(output)
         except ValueError:
+            logger.warning(f"Invalid commit count output: {output!r}")
             return 0
     return 0
 

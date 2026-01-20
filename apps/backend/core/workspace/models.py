@@ -6,6 +6,8 @@ Workspace Models
 Data classes and enums for workspace management.
 """
 
+import os
+import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -73,9 +75,6 @@ class MergeLock:
 
     def __enter__(self):
         """Acquire the merge lock."""
-        import os
-        import time
-
         self.lock_dir.mkdir(parents=True, exist_ok=True)
 
         # Try to acquire lock with timeout
@@ -99,26 +98,34 @@ class MergeLock:
 
             except FileExistsError:
                 # Lock file exists - check if process is still running
-                if self.lock_file.exists():
+                # Avoid TOCTOU race: read directly without exists() check
+                try:
+                    pid = int(self.lock_file.read_text(encoding="utf-8").strip())
+
                     try:
-                        pid = int(self.lock_file.read_text(encoding="utf-8").strip())
-                        # Import locally to avoid circular dependency
-                        import os as _os
+                        os.kill(pid, 0)
+                        is_running = True
+                    except ProcessLookupError:
+                        # Process definitely doesn't exist
+                        is_running = False
+                    except PermissionError:
+                        # On Windows, PermissionError means process exists but we can't signal it
+                        is_running = True
+                    except OSError:
+                        # Other OS errors - assume process not running
+                        is_running = False
 
-                        try:
-                            _os.kill(pid, 0)
-                            is_running = True
-                        except (OSError, ProcessLookupError):
-                            is_running = False
-
-                        if not is_running:
-                            # Stale lock - remove it
-                            self.lock_file.unlink()
-                            continue
-                    except (ValueError, ProcessLookupError):
-                        # Invalid PID or can't check - remove stale lock
-                        self.lock_file.unlink()
+                    if not is_running:
+                        # Stale lock - remove it
+                        self.lock_file.unlink(missing_ok=True)
                         continue
+                except FileNotFoundError:
+                    # Lock was removed by another process, retry
+                    continue
+                except ValueError:
+                    # Invalid PID in lock file - remove stale lock
+                    self.lock_file.unlink(missing_ok=True)
+                    continue
 
                 # Active lock - wait or timeout
                 if time.time() - start_time >= max_wait:
@@ -164,9 +171,6 @@ class SpecNumberLock:
 
     def __enter__(self) -> "SpecNumberLock":
         """Acquire the spec numbering lock."""
-        import os
-        import time
-
         self.lock_dir.mkdir(parents=True, exist_ok=True)
 
         max_wait = 30  # seconds
@@ -189,25 +193,34 @@ class SpecNumberLock:
 
             except FileExistsError:
                 # Lock file exists - check if process is still running
-                if self.lock_file.exists():
+                # Avoid TOCTOU race: read directly without exists() check
+                try:
+                    pid = int(self.lock_file.read_text(encoding="utf-8").strip())
+
                     try:
-                        pid = int(self.lock_file.read_text(encoding="utf-8").strip())
-                        import os as _os
+                        os.kill(pid, 0)
+                        is_running = True
+                    except ProcessLookupError:
+                        # Process definitely doesn't exist
+                        is_running = False
+                    except PermissionError:
+                        # On Windows, PermissionError means process exists but we can't signal it
+                        is_running = True
+                    except OSError:
+                        # Other OS errors - assume process not running
+                        is_running = False
 
-                        try:
-                            _os.kill(pid, 0)
-                            is_running = True
-                        except (OSError, ProcessLookupError):
-                            is_running = False
-
-                        if not is_running:
-                            # Stale lock - remove it
-                            self.lock_file.unlink()
-                            continue
-                    except (ValueError, ProcessLookupError):
-                        # Invalid PID or can't check - remove stale lock
-                        self.lock_file.unlink()
+                    if not is_running:
+                        # Stale lock - remove it
+                        self.lock_file.unlink(missing_ok=True)
                         continue
+                except FileNotFoundError:
+                    # Lock was removed by another process, retry
+                    continue
+                except ValueError:
+                    # Invalid PID in lock file - remove stale lock
+                    self.lock_file.unlink(missing_ok=True)
+                    continue
 
                 # Active lock - wait or timeout
                 if time.time() - start_time >= max_wait:

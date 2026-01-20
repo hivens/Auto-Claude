@@ -345,7 +345,9 @@ def _run_cli() -> None:
 
     # Handle batch commands
     if args.batch_create:
-        handle_batch_create_command(args.batch_create, str(project_dir))
+        success = handle_batch_create_command(args.batch_create, str(project_dir))
+        if not success:
+            sys.exit(1)
         return
 
     if args.batch_status:
@@ -432,7 +434,7 @@ def _run_cli() -> None:
             draft=args.pr_draft,
         )
         # JSON output is already printed by handle_create_pr_command
-        if not result.get("success"):
+        if not result or not result.get("success"):
             sys.exit(1)
         return
 

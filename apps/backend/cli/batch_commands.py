@@ -48,11 +48,21 @@ def handle_batch_create_command(batch_file: str, project_dir: str) -> bool:
     specs_dir = Path(project_dir) / ".auto-claude" / "specs"
     specs_dir.mkdir(parents=True, exist_ok=True)
 
-    # Find next spec ID
+    # Find next spec ID (safely parse numeric prefixes)
     existing_specs = [d.name for d in specs_dir.iterdir() if d.is_dir()]
-    next_id = (
-        max([int(s.split("-")[0]) for s in existing_specs if s[0].isdigit()] or [0]) + 1
-    )
+
+    def safe_parse_spec_id(spec_name: str) -> int | None:
+        """Safely parse the numeric prefix from a spec name like '001-feature'."""
+        try:
+            first_part = spec_name.split("-")[0]
+            # Only accept if it's purely numeric
+            return int(first_part) if first_part.isdigit() else None
+        except (ValueError, IndexError):
+            return None
+
+    valid_ids = [safe_parse_spec_id(s) for s in existing_specs]
+    valid_ids = [i for i in valid_ids if i is not None]
+    next_id = (max(valid_ids) if valid_ids else 0) + 1
 
     created_specs = []
 

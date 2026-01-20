@@ -437,7 +437,8 @@ def load_claude_md(project_dir: Path) -> str | None:
     if claude_md_path.exists():
         try:
             return claude_md_path.read_text(encoding="utf-8")
-        except Exception:
+        except (OSError, UnicodeDecodeError) as e:
+            logger.warning(f"Failed to load CLAUDE.md: {e}")
             return None
     return None
 

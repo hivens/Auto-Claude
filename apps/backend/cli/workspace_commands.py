@@ -66,27 +66,33 @@ def _detect_default_branch(project_dir: Path) -> str:
     env_branch = os.getenv("DEFAULT_BRANCH")
     if env_branch:
         # Verify the branch exists
-        result = subprocess.run(
-            ["git", "rev-parse", "--verify", env_branch],
-            cwd=project_dir,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0:
-            return env_branch
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--verify", env_branch],
+                cwd=project_dir,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                return env_branch
+        except subprocess.TimeoutExpired:
+            pass  # Fall through to auto-detect
 
     # 2. Auto-detect main/master
     for branch in ["main", "master"]:
-        result = subprocess.run(
-            ["git", "rev-parse", "--verify", branch],
-            cwd=project_dir,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0:
-            return branch
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--verify", branch],
+                cwd=project_dir,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                return branch
+        except subprocess.TimeoutExpired:
+            continue  # Try next branch
 
     # 3. Fall back to "main" as final default
     return "main"

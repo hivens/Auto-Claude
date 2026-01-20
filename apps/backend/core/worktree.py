@@ -399,7 +399,10 @@ class WorktreeManager:
             ["rev-list", "--count", f"{self.base_branch}..HEAD"], cwd=worktree_path
         )
         if result.returncode == 0:
-            stats["commit_count"] = int(result.stdout.strip() or "0")
+            try:
+                stats["commit_count"] = int(result.stdout.strip() or "0")
+            except ValueError:
+                stats["commit_count"] = 0
 
         # Last commit date (most recent commit in this worktree)
         result = self._run_git(
@@ -798,7 +801,9 @@ class WorktreeManager:
         registered_paths = set()
         for line in result.stdout.split("\n"):
             if line.startswith("worktree "):
-                registered_paths.add(Path(line.split(" ", 1)[1]))
+                parts = line.split(" ", 1)
+                if len(parts) > 1 and parts[1]:
+                    registered_paths.add(Path(parts[1]))
 
         # Remove unregistered directories
         for item in self.worktrees_dir.iterdir():

@@ -76,7 +76,9 @@ async def _save_to_graphiti_async(
                 result = False
             return result
         finally:
-            # Always close the memory connection (swallow exceptions to avoid overriding)
+            # Always close the memory connection.
+            # We swallow exceptions here because we're in a finally block - if an
+            # exception occurred in the try block, we don't want close() to mask it.
             try:
                 await memory.close()
             except Exception as e:
@@ -246,8 +248,11 @@ def create_memory_tools(spec_dir: Path, project_dir: Path) -> list:
                 entry += f"\n\n_Context: {context}_"
             entry += "\n"
 
-            with open(gotchas_file, "a", encoding="utf-8") as f:
-                if not gotchas_file.exists() or gotchas_file.stat().st_size == 0:
+            # Use "a+" mode and check file position to avoid race condition
+            # (checking exists() after opening in "a" mode is always True)
+            with open(gotchas_file, "a+", encoding="utf-8") as f:
+                # In "a+" mode, position starts at end - if 0, file is empty
+                if f.tell() == 0:
                     f.write(
                         "# Gotchas & Pitfalls\n\nThings to watch out for in this codebase.\n"
                     )

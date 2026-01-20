@@ -7,6 +7,7 @@ memory updates, recovery tracking, and Linear integration.
 """
 
 import logging
+import traceback
 from pathlib import Path
 
 from claude_agent_sdk import ClaudeSDKClient
@@ -541,14 +542,17 @@ async def run_agent_session(
         return "continue", response_text
 
     except Exception as e:
+        tb = traceback.format_exc()
         debug_error(
             "session",
             f"Session error: {e}",
             exception_type=type(e).__name__,
             message_count=message_count,
             tool_count=tool_count,
+            traceback=tb,
         )
+        logger.error(f"Error during agent session: {e}\n{tb}")
         print(f"Error during agent session: {e}")
         if task_logger:
-            task_logger.log_error(f"Session error: {e}", phase)
+            task_logger.log_error(f"Session error: {e}\n{tb}", phase)
         return "error", str(e)

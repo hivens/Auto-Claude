@@ -42,7 +42,7 @@ except ImportError:
     ClaudeAgentOptions = None
     ClaudeSDKClient = None
 
-from core.auth import ensure_claude_code_oauth_token, get_auth_token
+from core.auth import ensure_claude_code_oauth_token, get_auth_token, get_sdk_env_vars
 from debug import (
     debug,
     debug_detailed,
@@ -196,12 +196,16 @@ Current question: {message}"""
 
     try:
         # Build options dict - only include max_thinking_tokens if not None
+        # Get SDK env vars (includes CLAUDE_CODE_GIT_BASH_PATH on Windows)
+        sdk_env = get_sdk_env_vars()
+
         options_kwargs = {
             "model": resolve_model_id(model),  # Resolve via API Profile if configured
             "system_prompt": system_prompt,
             "allowed_tools": ["Read", "Glob", "Grep"],
             "max_turns": 30,  # Allow sufficient turns for codebase exploration
             "cwd": str(project_path),
+            "env": sdk_env,  # Pass CLAUDE_CODE_GIT_BASH_PATH etc. to subprocess
         }
 
         # Only add thinking tokens if the thinking level is not "none"
