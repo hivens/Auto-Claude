@@ -632,8 +632,10 @@ def _find_git_bash_path() -> str | None:
         common_git_paths = [
             os.path.expandvars(r"%PROGRAMFILES%\Git\cmd\git.exe"),
             os.path.expandvars(r"%PROGRAMFILES%\Git\bin\git.exe"),
+            os.path.expandvars(r"%PROGRAMFILES%\Git\mingw64\bin\git.exe"),  # Another common location
             os.path.expandvars(r"%PROGRAMFILES(X86)%\Git\cmd\git.exe"),
             os.path.expandvars(r"%LOCALAPPDATA%\Programs\Git\cmd\git.exe"),
+            os.path.expandvars(r"%USERPROFILE%\scoop\apps\git\current\cmd\git.exe"),  # Scoop
         ]
         for path in common_git_paths:
             if os.path.exists(path):
@@ -653,10 +655,13 @@ def _find_git_bash_path() -> str | None:
     git_grandparent = os.path.dirname(git_parent)
 
     # Check common bash.exe locations relative to git installation
+    # Git for Windows 2.44+ moved bash.exe to usr/bin
     possible_bash_paths = [
-        os.path.join(git_parent, "bin", "bash.exe"),  # cmd -> bin
+        os.path.join(git_parent, "usr", "bin", "bash.exe"),  # Git 2.44+ - cmd -> usr/bin
+        os.path.join(git_parent, "bin", "bash.exe"),  # Legacy - cmd -> bin
         os.path.join(git_dir, "bash.exe"),  # If git.exe is in bin
-        os.path.join(git_grandparent, "bin", "bash.exe"),  # mingw64/bin -> bin
+        os.path.join(git_grandparent, "usr", "bin", "bash.exe"),  # mingw64/bin -> usr/bin
+        os.path.join(git_grandparent, "bin", "bash.exe"),  # mingw64/bin -> bin (legacy)
     ]
 
     for bash_path in possible_bash_paths:

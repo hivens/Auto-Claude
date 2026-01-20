@@ -7,6 +7,7 @@ and file editing capabilities.
 """
 
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -138,18 +139,11 @@ def open_file_in_editor(file_path: Path) -> bool:
     # Get editor from environment or use fallbacks
     editor = os.environ.get("EDITOR", "")
     if not editor:
-        # Try common editors in order
-        for candidate in ["code", "nano", "vim", "vi"]:
-            try:
-                subprocess.run(
-                    ["which", candidate],
-                    capture_output=True,
-                    check=True,
-                )
+        # Try common editors in order (use shutil.which for cross-platform support)
+        for candidate in ["code", "nano", "vim", "vi", "notepad"]:  # Added notepad for Windows
+            if shutil.which(candidate):
                 editor = candidate
                 break
-            except subprocess.CalledProcessError:
-                continue
 
     if not editor:
         print_status("No editor found. Set $EDITOR environment variable.", "error")
