@@ -13,6 +13,7 @@ import type {
 import { MODEL_ID_MAP } from '../../shared/constants';
 import { InsightsConfig } from './config';
 import { detectRateLimit, createSDKRateLimitInfo } from '../rate-limit-detector';
+import { shouldUseShell } from '../env-utils';
 
 /**
  * Message processor result
@@ -118,11 +119,26 @@ export class InsightsExecutor extends EventEmitter {
     }
 
     // Spawn Python process
-    const proc = spawn(this.config.getPythonPath(), args, {
+    // On Windows, .cmd files require shell: true
+    const pythonPath = this.config.getPythonPath();
+
+    // DEBUG LOGGING
+    console.log('[Insights Debug] ========================================');
+    console.log('[Insights Debug] Starting Python process');
+    console.log('[Insights Debug] pythonPath:', pythonPath);
+    console.log('[Insights Debug] runnerPath:', runnerPath);
+    console.log('[Insights Debug] autoBuildSource:', autoBuildSource);
+    console.log('[Insights Debug] args:', JSON.stringify(args.slice(0, 3)));  // First 3 args only
+    console.log('[Insights Debug] shell:', shouldUseShell(pythonPath));
+    console.log('[Insights Debug] ENV keys:', Object.keys(processEnv).filter(k => k.startsWith('CLAUDE') || k.startsWith('ANTHROPIC') || k === 'PYTHONPATH').join(', '));
+
+    const proc = spawn(pythonPath, args, {
       cwd: autoBuildSource,
-      env: processEnv
+      env: processEnv,
+      shell: shouldUseShell(pythonPath)
     });
 
+    console.log('[Insights Debug] Process spawned, pid:', proc.pid);
     this.activeSessions.set(projectId, proc);
 
     return new Promise((resolve, reject) => {
@@ -131,9 +147,13 @@ export class InsightsExecutor extends EventEmitter {
       const toolsUsed: InsightsToolUsage[] = [];
       let allInsightsOutput = '';
       let stderrOutput = '';
+      let stdoutChunkCount = 0;
 
       proc.stdout?.on('data', (data: Buffer) => {
         const text = data.toString();
+        stdoutChunkCount++;
+        console.log(`[Insights Debug] stdout chunk #${stdoutChunkCount}, len=${text.length}, preview:`, text.slice(0, 100).replace(/\n/g, '\\n'));
+
         // Collect output for rate limit detection (keep last 10KB)
         allInsightsOutput = (allInsightsOutput + text).slice(-10000);
 
@@ -160,6 +180,7 @@ export class InsightsExecutor extends EventEmitter {
 
       proc.stderr?.on('data', (data: Buffer) => {
         const text = data.toString();
+        console.log('[Insights Debug] stderr:', text.slice(0, 500));
         // Collect stderr for rate limit detection and error reporting
         allInsightsOutput = (allInsightsOutput + text).slice(-10000);
         stderrOutput = (stderrOutput + text).slice(-2000);
@@ -167,6 +188,9 @@ export class InsightsExecutor extends EventEmitter {
       });
 
       proc.on('close', (code) => {
+        console.log('[Insights Debug] Process closed with code:', code);
+        console.log('[Insights Debug] Total stdout chunks received:', stdoutChunkCount);
+        console.log('[Insights Debug] Total response length:', fullResponse.length);
         this.activeSessions.delete(projectId);
 
         // Cleanup temp file
@@ -214,6 +238,7 @@ export class InsightsExecutor extends EventEmitter {
       });
 
       proc.on('error', (err) => {
+        console.log('[Insights Debug] Process ERROR:', err.message);
         this.activeSessions.delete(projectId);
 
         // Cleanup temp file

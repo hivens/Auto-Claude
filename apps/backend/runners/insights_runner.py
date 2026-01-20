@@ -9,6 +9,9 @@ about a codebase. It can also suggest tasks based on the conversation.
 import argparse
 import asyncio
 import json
+import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -145,21 +148,23 @@ async def run_with_sdk(
     thinking_level: str = "medium",
 ) -> None:
     """Run the chat using Claude SDK with streaming."""
+    print("[Python Debug] run_with_sdk() called", file=sys.stderr, flush=True)
+
     if not SDK_AVAILABLE:
-        print("Claude SDK not available, falling back to simple mode", file=sys.stderr)
+        print("[Python Debug] SDK not available, falling back", file=sys.stderr, flush=True)
         run_simple(project_dir, message, history)
         return
 
+    print("[Python Debug] Checking auth token...", file=sys.stderr, flush=True)
     if not get_auth_token():
-        print(
-            "No authentication token found, falling back to simple mode",
-            file=sys.stderr,
-        )
+        print("[Python Debug] No auth token found, falling back", file=sys.stderr, flush=True)
         run_simple(project_dir, message, history)
         return
 
+    print("[Python Debug] Auth token found, ensuring OAuth token...", file=sys.stderr, flush=True)
     # Ensure SDK can find the token
     ensure_claude_code_oauth_token()
+    print("[Python Debug] OAuth token ensured", file=sys.stderr, flush=True)
 
     system_prompt = build_system_prompt(project_dir)
     project_path = Path(project_dir).resolve()
@@ -204,12 +209,18 @@ Current question: {message}"""
             options_kwargs["max_thinking_tokens"] = max_thinking_tokens
 
         # Create Claude SDK client with appropriate settings for insights
+        print("[Python Debug] Creating SDK client...", file=sys.stderr, flush=True)
+        print(f"[Python Debug] Model: {options_kwargs.get('model')}", file=sys.stderr, flush=True)
         client = ClaudeSDKClient(options=ClaudeAgentOptions(**options_kwargs))
+        print("[Python Debug] SDK client created", file=sys.stderr, flush=True)
 
         # Use async context manager pattern
+        print("[Python Debug] Entering async context...", file=sys.stderr, flush=True)
         async with client:
+            print("[Python Debug] Inside async context, sending query...", file=sys.stderr, flush=True)
             # Send the query
             await client.query(full_prompt)
+            print("[Python Debug] Query sent, waiting for response...", file=sys.stderr, flush=True)
 
             # Stream the response
             response_text = ""
@@ -288,8 +299,6 @@ Current question: {message}"""
 
 def run_simple(project_dir: str, message: str, history: list) -> None:
     """Simple fallback mode without SDK - uses subprocess to call claude CLI."""
-    import subprocess
-
     system_prompt = build_system_prompt(project_dir)
 
     # Build conversation context
@@ -308,13 +317,44 @@ User: {message}
 Assistant:"""
 
     try:
+        # Find claude CLI path - on Windows it may be claude.cmd
+        # Ensure PATHEXT includes .cmd for shutil.which() to find it
+        if sys.platform == "win32":
+            current_pathext = os.environ.get("PATHEXT", "")
+            if ".CMD" not in current_pathext.upper():
+                os.environ["PATHEXT"] = current_pathext + ";.CMD" if current_pathext else ".COM;.EXE;.BAT;.CMD"
+
+        claude_cmd = shutil.which("claude")
+        if not claude_cmd:
+            # Try Windows-specific paths
+            if sys.platform == "win32":
+                appdata = os.environ.get("APPDATA", "")
+                localappdata = os.environ.get("LOCALAPPDATA", "")
+
+                windows_paths = []
+                if appdata:
+                    windows_paths.append(os.path.join(appdata, "npm", "claude.cmd"))
+                if localappdata:
+                    windows_paths.append(os.path.join(localappdata, "Programs", "Claude", "claude.exe"))
+
+                for path in windows_paths:
+                    if os.path.exists(path):
+                        claude_cmd = path
+                        break
+
+            if not claude_cmd:
+                raise FileNotFoundError("Claude CLI not found")
+
         # Try to use claude CLI with --print for simple output
+        # On Windows, use shell=True for .cmd files
+        use_shell = sys.platform == "win32" and claude_cmd.endswith(".cmd")
         result = subprocess.run(
-            ["claude", "--print", "-p", full_prompt],
+            [claude_cmd, "--print", "-p", full_prompt],
             capture_output=True,
             text=True,
             cwd=project_dir,
             timeout=120,
+            shell=use_shell,
         )
 
         if result.returncode == 0:
@@ -341,6 +381,12 @@ Assistant:"""
 
 
 def main():
+    # Early stderr logging for debugging - this is captured by Electron
+    print("[Python Debug] insights_runner.py starting...", file=sys.stderr, flush=True)
+    print(f"[Python Debug] Python version: {sys.version}", file=sys.stderr, flush=True)
+    print(f"[Python Debug] Working dir: {os.getcwd()}", file=sys.stderr, flush=True)
+    print(f"[Python Debug] SDK_AVAILABLE: {SDK_AVAILABLE}", file=sys.stderr, flush=True)
+
     parser = argparse.ArgumentParser(description="Insights AI Chat Runner")
     parser.add_argument("--project-dir", required=True, help="Project directory path")
     parser.add_argument("--message", required=True, help="User message")
@@ -360,6 +406,7 @@ def main():
         help="Thinking level for extended reasoning (default: medium)",
     )
     args = parser.parse_args()
+    print(f"[Python Debug] Args parsed: project_dir={args.project_dir[:50]}..., model={args.model}", file=sys.stderr, flush=True)
 
     debug_section("insights_runner", "Starting Insights Chat")
 
