@@ -32,8 +32,10 @@ const GITHUB_REPO = 'Auto-Claude';
 const DEBUG_UPDATER = process.env.DEBUG_UPDATER === 'true' || process.env.NODE_ENV === 'development';
 
 // Configure electron-updater
-autoUpdater.autoDownload = true;  // Automatically download updates when available
-autoUpdater.autoInstallOnAppQuit = true;  // Automatically install on app quit
+// DISABLED: Auto-download causes issues when local version is newer than GitHub releases
+// Users can manually check for updates via Settings
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
 
 // Update channels: 'latest' for stable, 'beta' for pre-release
 type UpdateChannel = 'latest' | 'beta';
@@ -103,7 +105,17 @@ export function initializeAppUpdater(window: BrowserWindow, betaUpdates = false)
 
   // Update available - new version found
   autoUpdater.on('update-available', (info) => {
-    console.warn('[app-updater] Update available:', info.version);
+    const currentVersion = autoUpdater.currentVersion.version;
+    const isNewer = compareVersions(info.version, currentVersion) > 0;
+
+    console.warn(`[app-updater] Update available: ${info.version} (current: ${currentVersion}, isNewer: ${isNewer})`);
+
+    // Don't notify about "updates" that are actually older versions
+    if (!isNewer) {
+      console.warn(`[app-updater] Skipping ${info.version} - not newer than current ${currentVersion}`);
+      return;
+    }
+
     if (mainWindow) {
       mainWindow.webContents.send(IPC_CHANNELS.APP_UPDATE_AVAILABLE, {
         version: info.version,
@@ -115,7 +127,17 @@ export function initializeAppUpdater(window: BrowserWindow, betaUpdates = false)
 
   // Update downloaded - ready to install
   autoUpdater.on('update-downloaded', (info) => {
-    console.warn('[app-updater] Update downloaded:', info.version);
+    const currentVersion = autoUpdater.currentVersion.version;
+    const isNewer = compareVersions(info.version, currentVersion) > 0;
+
+    console.warn(`[app-updater] Update downloaded: ${info.version} (current: ${currentVersion}, isNewer: ${isNewer})`);
+
+    // Don't notify about "updates" that are actually older versions
+    if (!isNewer) {
+      console.warn(`[app-updater] Skipping downloaded ${info.version} - not newer than current ${currentVersion}`);
+      return;
+    }
+
     // Store downloaded update info so it persists across Settings page navigations
     // releaseNotes can be string | ReleaseNoteInfo[] | null | undefined, only use if string
     downloadedUpdateInfo = {
